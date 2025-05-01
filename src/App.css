@@ -36,3 +36,49 @@
     transform: rotate(360deg);
   }
 }
+
+#contentContainer {
+    width: 100%;
+    min-width: 1000px;
+    height: 100%;
+}
+
+#tableDesign {
+    font-family: Arial, Helvetica, sans-serif;
+    border-collapse: collapse;
+    width: 100%;
+    scroll-behavior:auto;
+}
+
+
+#tableDesign tr:nth-child(even) {
+    background-color: #f2f2f2;
+}
+
+#tableDesign tr:hover {
+    background-color: #ddd;
+}
+
+    #tableDesign th {
+        padding-top: 12px;
+        padding-bottom: 12px;
+        text-align: left;
+        background-color: #060606;
+        color: white;
+    }
+
+
+#tableDesign td, #tableDesign th {
+    border: 1px solid #ddd;
+    padding: 8px;
+}
+
+#exportButton {
+    color: white;
+    background-color: #3e6997;
+    border: 0px;
+    width: 100px;
+    height: 30px;
+    border-radius: 5px;
+    float: right
+}
