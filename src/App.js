@@ -46,7 +46,7 @@ export default class App extends Component {
             amountCounted: 14,
         };
 
-        fetch('api/Items', {
+        fetch(process.env.REACT_APP_Backed_URL + 'Items', {
             method: 'POST',
             headers: {
                 'Accept': 'application/json',
@@ -57,7 +57,7 @@ export default class App extends Component {
     }
 
     async createFile() {
-        fetch('api/Items/Export', {
+        fetch(process.env.REACT_APP_Backed_URL + 'Items/Export', {
             method: 'GET',
             headers: {
                 'Accept': 'application/json',
@@ -96,7 +96,7 @@ export default class App extends Component {
     
 
     async populateWeatherData() {
-        const response = await fetch('api/Items');
+        const response = await fetch(process.env.REACT_APP_Backed_URL + 'Items');
         const data = await response.json();
         this.setState({ items: data, loading: false });
     }
