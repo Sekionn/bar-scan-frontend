@@ -40,7 +40,6 @@ export default class App extends Component {
 
     addMockData() {
         const item = {
-            id: 0,
             shelfOfOrigin: 1,
             barcode: "11111",
             amountCounted: 14,
