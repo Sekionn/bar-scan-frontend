@@ -47,6 +47,9 @@ export default class App extends Component {
 
         fetch(process.env.REACT_APP_Backed_URL + 'Items', {
             method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+            },
             body: JSON.stringify(item)
         })
     }
