@@ -1,10 +1,24 @@
-import React, { Component } from 'react';
+import { Component } from 'react';
 import './App.css';
+import { apiFetch } from './api';
 
-export default class App extends Component {
+interface Product {
+    id: number;
+    shelfOfOrigin: number;
+    barcode: string;
+    amountCounted: number;
+    date?: string;
+}
+
+interface AppState {
+    items: Product[];
+    loading: boolean;
+}
+
+export default class App extends Component<Record<string, never>, AppState> {
     static displayName = App.name;
 
-    constructor(props) {
+    constructor(props: Record<string, never>) {
         super(props);
         this.state = { items: [], loading: true };
     }
@@ -13,7 +27,7 @@ export default class App extends Component {
         this.populateProducts();
     }
 
-    static renderItemsTable(items) {
+    static renderItemsTable(items: Product[]) {
         return (
             <table id='tableDesign' className='tableheader' aria-labelledby="tabelLabel">
                 <thead>
@@ -45,7 +59,7 @@ export default class App extends Component {
             amountCounted: 14,
         };
 
-        fetch(process.env.REACT_APP_Backed_URL + 'products', {
+        return apiFetch('products', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -54,27 +68,21 @@ export default class App extends Component {
         })
     }
 
-    async createFile() {
-        fetch(process.env.REACT_APP_Backed_URL + 'products/Export', {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            },
-        }).then((data) => data.json()).then((data) => {
-            const element = document.createElement("a");
-            const file = new Blob([data],
-                { type: 'text/plain;charset=utf-8' });
-            element.href = URL.createObjectURL(file);
-            element.download = "Status.txt";
-            document.body.appendChild(element);
-            element.click();
-        })
-
+    createFile = () => {
+        const element = document.createElement('a');
+        const file = new Blob([JSON.stringify(this.state.items, null, 2)],
+            { type: 'application/json;charset=utf-8' });
+        const objectUrl = URL.createObjectURL(file);
+        element.href = objectUrl;
+        element.download = 'Status.json';
+        document.body.appendChild(element);
+        element.click();
+        element.remove();
+        URL.revokeObjectURL(objectUrl);
     }
 
     render() {
-        let contents = this.state.loading
+        const contents = this.state.loading
             ? <p><em>Loading... Please refresh once the ASP.NET backend has started. See <a href="https://aka.ms/jspsintegrationreact">https://aka.ms/jspsintegrationreact</a> for more details.</em></p>
             : App.renderItemsTable(this.state.items);
         return (
@@ -94,8 +102,8 @@ export default class App extends Component {
     
 
     async populateProducts() {
-        const response = await fetch(process.env.REACT_APP_Backed_URL + 'products');
-        const data = await response.json();
+        const response = await apiFetch('products');
+        const data: Product[] = await response.json();
         this.setState({ items: data, loading: false });
     }
 }

@@ -5,6 +5,6 @@ services:
       context: .
       dockerfile: ./Dockerfile
     environment:
-      NODE_ENV: production
+      BACKEND_URL: ${BACKEND_URL:-https://bar-scan-api-java.juuls-trinkets.com}
     ports:
-      - 3000:3000
+      - 3000:8080

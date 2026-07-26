@@ -1,70 +1,107 @@
-# Getting Started with Create React App
+# Bar Scan frontend
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+React and TypeScript frontend built with Vite. In production, the public Nginx LXC terminates HTTPS for `bar-scan.juuls-trinkets.com`; the frontend container listens on private port `8080`.
 
-## Available Scripts
+## Local development
 
-In the project directory, you can run:
+```powershell
+npm install
+npm run dev
+```
 
-### `npm start`
+Spring is expected at `https://localhost:8080` by default. Override `VITE_DEV_API_TARGET` in `.env.local` when necessary.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## Build the deployable image
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+No certificate is needed in this image because the public Nginx LXC owns the domain and certificate.
 
-### `npm test`
+```bash
+docker build --pull -t bar-scan-frontend:latest .
+```
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+Optionally export and copy the image to the Docker LXC:
 
-### `npm run build`
+```bash
+docker save bar-scan-frontend:latest | gzip > bar-scan-frontend.tar.gz
+scp bar-scan-frontend.tar.gz root@DOCKER_LXC_IP:/opt/bar-scan/
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+On the Docker LXC:
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+```bash
+gunzip -c /opt/bar-scan/bar-scan-frontend.tar.gz | docker load
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+docker run -d \
+  --name bar-scan-frontend \
+  --restart unless-stopped \
+  -p DOCKER_LXC_IP:3000:8080 \
+  -e BACKEND_URL=https://bar-scan-api-java.juuls-trinkets.com \
+  bar-scan-frontend:latest
+```
 
-### `npm run eject`
+Replace `DOCKER_LXC_IP` with the Docker LXC's private address. Binding to that address avoids exposing the application on every host interface. Allow port `3000` only from the Nginx LXC in the Proxmox/firewall rules.
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+To update the container:
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+```bash
+docker build --pull -t bar-scan-frontend:latest .
+docker stop bar-scan-frontend
+docker rm bar-scan-frontend
+# Run the docker run command above again.
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+## Public Nginx LXC
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+Create DNS records pointing `bar-scan.juuls-trinkets.com` to the public IP that forwards ports 80 and 443 to the Nginx LXC. Configure Nginx to proxy the hostname to `http://DOCKER_LXC_IP:3000`.
 
-## Learn More
+```nginx
+server {
+    listen 80;
+    listen [::]:80;
+    server_name bar-scan.juuls-trinkets.com;
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+    location / {
+        proxy_pass http://DOCKER_LXC_IP:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+After this HTTP configuration is reachable publicly, obtain and install the certificate on the Nginx LXC:
 
-### Code Splitting
+```bash
+sudo certbot --nginx -d bar-scan.juuls-trinkets.com
+sudo certbot renew --dry-run
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+Certbot updates Nginx for HTTPS and normally installs automatic renewal. The resulting request path is:
 
-### Analyzing the Bundle Size
+```text
+Browser --HTTPS--> Nginx LXC --private HTTP--> frontend container
+                                              |
+                                              +-- /api/* --> HTTPS Spring API
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+The browser-facing connection is HTTPS. Private HTTP between the two LXCs does not create mixed-content because the browser communicates only with the public Nginx LXC. Do not expose the frontend container directly to the internet.
 
-### Making a Progressive Web App
+## Verification
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+```bash
+docker ps --filter name=bar-scan-frontend
+docker logs bar-scan-frontend
+curl -I http://DOCKER_LXC_IP:3000
+curl -I https://bar-scan.juuls-trinkets.com
+```
 
-### Advanced Configuration
+## npm commands
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+- `npm run dev` - Vite development server
+- `npm run build` - production bundle in `dist/`
+- `npm run typecheck` - strict TypeScript validation
+- `npm run preview` - preview the production bundle
+- `npm test` - run Vitest
+- `npm run lint` - run ESLint
