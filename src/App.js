@@ -10,7 +10,7 @@ export default class App extends Component {
     }
 
     componentDidMount() {
-        this.populateWeatherData();
+        this.populateProducts();
     }
 
     static renderItemsTable(items) {
@@ -45,7 +45,7 @@ export default class App extends Component {
             amountCounted: 14,
         };
 
-        fetch(process.env.REACT_APP_Backed_URL + 'Items', {
+        fetch(process.env.REACT_APP_Backed_URL + 'products', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -55,7 +55,7 @@ export default class App extends Component {
     }
 
     async createFile() {
-        fetch(process.env.REACT_APP_Backed_URL + 'Items/Export', {
+        fetch(process.env.REACT_APP_Backed_URL + 'products/Export', {
             method: 'GET',
             headers: {
                 'Accept': 'application/json',
@@ -93,7 +93,7 @@ export default class App extends Component {
 
     
 
-    async populateWeatherData() {
+    async populateProducts() {
         const response = await fetch(process.env.REACT_APP_Backed_URL + 'products');
         const data = await response.json();
         this.setState({ items: data, loading: false });
