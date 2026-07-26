@@ -13,7 +13,7 @@ export default class App extends Component {
         this.populateWeatherData();
     }
 
-    static renderForecastsTable(items) {
+    static renderItemsTable(items) {
         return (
             <table id='tableDesign' className='tableheader' aria-labelledby="tabelLabel">
                 <thead>
@@ -25,12 +25,12 @@ export default class App extends Component {
                     </tr>
                 </thead>
                 <tbody >
-                    {items.map(forecast =>
-                        <tr key={forecast.id}>
-                            <td>{forecast.shelfOfOrigin}</td>
-                            <td>{forecast.barcode}</td>
-                            <td>{forecast.amountCounted}</td>
-                            <td>{forecast.date}</td>
+                    {items.map(item =>
+                        <tr key={item.id}>
+                            <td>{item.shelfOfOrigin}</td>
+                            <td>{item.barcode}</td>
+                            <td>{item.amountCounted}</td>
+                            <td>{item.date}</td>
                         </tr>
                     )}
                 </tbody>
@@ -76,7 +76,7 @@ export default class App extends Component {
     render() {
         let contents = this.state.loading
             ? <p><em>Loading... Please refresh once the ASP.NET backend has started. See <a href="https://aka.ms/jspsintegrationreact">https://aka.ms/jspsintegrationreact</a> for more details.</em></p>
-            : App.renderForecastsTable(this.state.items);
+            : App.renderItemsTable(this.state.items);
         return (
             <div>
                 <div id='contentContainer'>
