@@ -94,7 +94,7 @@ export default class App extends Component {
     
 
     async populateWeatherData() {
-        const response = await fetch(process.env.REACT_APP_Backed_URL + 'Items');
+        const response = await fetch(process.env.REACT_APP_Backed_URL + 'products');
         const data = await response.json();
         this.setState({ items: data, loading: false });
     }
