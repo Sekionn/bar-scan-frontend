@@ -1,109 +1,53 @@
-import { Component } from 'react';
+import { Navigate, Route, Routes } from 'react-router-dom';
+import { AppLayout } from './components/layout/AppLayout';
+import { LocalOnlyRoute } from './components/routing/LocalOnlyRoute';
+import { ProtectedRoute } from './components/routing/ProtectedRoute';
+import { LoginPage } from './pages/auth/LoginPage';
+import { NotAuthorizedPage } from './pages/errors/NotAuthorizedPage';
+import { HomePage } from './pages/home/HomePage';
+import { ProductListPage } from './pages/inventory/ProductListPage';
+import { ScanSessionPage } from './pages/inventory/ScanSessionPage';
+import { PaymentPendingPage } from './pages/payment/PaymentPendingPage';
+import { ShopsPage } from './pages/shops/ShopsPage';
+import { SignupPage } from './pages/signup/SignupPage';
+import { SignupSubmittedPage } from './pages/signup/SignupSubmittedPage';
+import { SuperAdminPasswordPage } from './pages/super-admin/SuperAdminPasswordPage';
+import { UserManagementPage } from './pages/users/UserManagementPage';
 import './App.css';
-import { apiFetch } from './api';
 
-interface Product {
-    id: number;
-    shelfOfOrigin: number;
-    barcode: string;
-    amountCounted: number;
-    date?: string;
-}
+export default function App() {
+  return (
+    <Routes>
+      <Route element={<AppLayout />}>
+        <Route index element={<HomePage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
+        <Route path="/signup-submitted" element={<SignupSubmittedPage />} />
+        <Route path="/not-authorized" element={<NotAuthorizedPage />} />
 
-interface AppState {
-    items: Product[];
-    loading: boolean;
-}
+        <Route element={<LocalOnlyRoute />}>
+          <Route path="/payment-pending/:signupId" element={<PaymentPendingPage />} />
+        </Route>
 
-export default class App extends Component<Record<string, never>, AppState> {
-    static displayName = App.name;
+        <Route element={<ProtectedRoute allowedRoles={['ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_SUPER_ADMIN']} />}>
+          <Route path="/products" element={<ProductListPage />} />
+          <Route path="/scan-session" element={<ScanSessionPage />} />
+        </Route>
 
-    constructor(props: Record<string, never>) {
-        super(props);
-        this.state = { items: [], loading: true };
-    }
+        <Route element={<ProtectedRoute allowedRoles={['ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_SUPER_ADMIN']} />}>
+          <Route path="/users" element={<UserManagementPage />} />
+        </Route>
 
-    componentDidMount() {
-        this.populateProducts();
-    }
+        <Route element={<ProtectedRoute allowedRoles={['ROLE_MANAGER', 'ROLE_SUPER_ADMIN']} />}>
+          <Route path="/shops" element={<ShopsPage />} />
+        </Route>
 
-    static renderItemsTable(items: Product[]) {
-        return (
-            <table id='tableDesign' className='tableheader' aria-labelledby="tabelLabel">
-                <thead>
-                    <tr >
-                        <th>Reol</th>
-                        <th>Stregkode</th>
-                        <th>Antal</th>
-                        <th>Dato</th>
-                    </tr>
-                </thead>
-                <tbody >
-                    {items.map(item =>
-                        <tr key={item.id}>
-                            <td>{item.shelfOfOrigin}</td>
-                            <td>{item.barcode}</td>
-                            <td>{item.amountCounted}</td>
-                            <td>{item.date}</td>
-                        </tr>
-                    )}
-                </tbody>
-            </table>
-        );
-    }
+        <Route element={<ProtectedRoute requiredRole="ROLE_SUPER_ADMIN" />}>
+          <Route path="/super/users/password" element={<SuperAdminPasswordPage />} />
+        </Route>
 
-    addMockData() {
-        const item = {
-            shelfOfOrigin: 1,
-            barcode: "11111",
-            amountCounted: 14,
-        };
-
-        return apiFetch('products', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(item)
-        })
-    }
-
-    createFile = () => {
-        const element = document.createElement('a');
-        const file = new Blob([JSON.stringify(this.state.items, null, 2)],
-            { type: 'application/json;charset=utf-8' });
-        const objectUrl = URL.createObjectURL(file);
-        element.href = objectUrl;
-        element.download = 'Status.json';
-        document.body.appendChild(element);
-        element.click();
-        element.remove();
-        URL.revokeObjectURL(objectUrl);
-    }
-
-    render() {
-        const contents = this.state.loading
-            ? <p><em>Loading... Please refresh once the ASP.NET backend has started. See <a href="https://aka.ms/jspsintegrationreact">https://aka.ms/jspsintegrationreact</a> for more details.</em></p>
-            : App.renderItemsTable(this.state.items);
-        return (
-            <div>
-                <div id='contentContainer'>
-                    <h1 id="tabelLabel" >Alle scannede stregkoder</h1>
-                    {contents}
-                    <button onClick={this.addMockData}>Add mock data</button>
-                    <button id='exportButton' onClick={this.createFile}>Export</button>
-                </div>
-                
-
-            </div>
-        );
-    }
-
-    
-
-    async populateProducts() {
-        const response = await apiFetch('products');
-        const data: Product[] = await response.json();
-        this.setState({ items: data, loading: false });
-    }
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
+    </Routes>
+  );
 }

@@ -4,7 +4,9 @@ services:
     build:
       context: .
       dockerfile: ./Dockerfile
+      args:
+        VITE_BACKEND_URL: ${VITE_BACKEND_URL}
     environment:
       BACKEND_URL: ${BACKEND_URL:-https://bar-scan-api-java.juuls-trinkets.com}
     ports:
-      - 3000:8080
+      - 3000:80
