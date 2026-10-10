@@ -241,7 +241,7 @@ export async function apiDelete(path: string): Promise<void> {
 }
 
 export function login(payload: { username: string; password: string }) {
-  return publicApiPost<{ token: string }>('/auth/login', payload);
+  return publicApiPost<{ token: string }>('/auth/login', { ...payload, clientType: 'web' });
 }
 
 export function requestContactSignup(payload: {
