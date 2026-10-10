@@ -6,7 +6,7 @@ type LegalPageProps = {
   kind: LegalPageKind;
 };
 
-const supportEmail = 'support@juuls-trinkets.com';
+const supportEmail = 'support.bar-scan@juuls-trinkets.com';
 
 const legalContent: Record<LegalPageKind, {
   titleKey: string;
