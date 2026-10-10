@@ -45,13 +45,15 @@ VITE_BACKEND_URL=http://127.0.0.1:8080
 
 - `/signup` sends a contact/setup request for company signup.
 - `/signup-submitted` confirms that the contact request was received.
+- `/privacy`, `/terms`, and `/support` are public pages for app-store metadata,
+  customer support, and account/data deletion contact instructions.
 - `/super/users/password` lets a super admin set the first admin password after manual contact/payment.
 - `/payment-pending/:signupId` opens payment and polls onboarding status in local development only.
 - `/login` signs in admins and scanner users.
 - `/shops` lets managers and super admins create company shops.
 - `/users` lets admins, managers, and super admins create allowed user roles.
 - `/products` shows collected barcode/product counts with quarter filters and CSV/TXT export.
-- `/scan-session` shows a live-refresh scanner feed from backend product data.
+- `/scan-session` shows shop-grouped scanning sessions with their counted products.
 
 ## Backend Contract
 

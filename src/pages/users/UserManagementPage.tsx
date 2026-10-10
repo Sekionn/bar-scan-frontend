@@ -1,59 +1,133 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getShops, registerUser } from '../../api/client';
+import { apiGet, apiPost } from '../../api/client';
 import { useAuth } from '../../auth/useAuth';
 import { StatusMessage } from '../../components/feedback/StatusMessage';
-import type { CreatedUser, Role, Shop } from '../../types';
-
-type CreateableRole = Extract<Role, 'ROLE_USER' | 'ROLE_ADMIN' | 'ROLE_MANAGER'>;
+import { useTranslation } from '../../i18n/useTranslation';
+import type { CreatedUser, Shop } from '../../types';
 
 export function UserManagementPage() {
   const { session } = useAuth();
-  const [username, setUsername] = useState('');
+  const { t } = useTranslation();
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<CreateableRole>('ROLE_USER');
+  const [role, setRole] = useState('');
   const [shopId, setShopId] = useState('');
   const [shops, setShops] = useState<Shop[]>([]);
-  const [createdUsers, setCreatedUsers] = useState<CreatedUser[]>([]);
-  const [error, setError] = useState('');
+  const [users, setUsers] = useState<CreatedUser[]>([]);
+  const [pageError, setPageError] = useState('');
+  const [createError, setCreateError] = useState('');
+  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  const canAssignShopAndRole = session?.role === 'ROLE_MANAGER' || session?.role === 'ROLE_SUPER_ADMIN';
+  const canAssignShopAndRole = session?.capabilities.canAssignShopAndRole ?? false;
+  const assignableRoles = session?.assignableRoles ?? [];
+  const selectedRole = assignableRoles.find((option) => option.value === role);
+  const shouldAssignShop = canAssignShopAndRole && selectedRole?.requiresShop;
 
   function getShopName(targetShopId?: string) {
     if (!targetShopId) {
-      return 'None';
+      return t('users.companyUsers');
     }
 
-    return shops.find((shop) => shop.id === targetShopId)?.name ?? 'Assigned shop';
+    if (targetShopId === session?.shopId) {
+      return shops.find((shop) => shop.id === targetShopId)?.name ?? t('users.yourStore');
+    }
+
+    return shops.find((shop) => shop.id === targetShopId)?.name ?? t('users.store');
   }
 
-  const loadShops = useCallback(async () => {
-    if (!session || !canAssignShopAndRole) {
+  const loadUsers = useCallback(async () => {
+    if (!session) {
       return;
     }
 
+    setIsLoadingUsers(true);
+
     try {
-      const nextShops = await getShops(session.token);
-      setShops(nextShops);
-      setShopId((currentShopId) => currentShopId || nextShops[0]?.id || '');
+      const nextUsers = await apiGet<CreatedUser[]>('/auth/users');
+      setUsers(nextUsers);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : 'Could not load shops.');
+      setPageError(caughtError instanceof Error ? caughtError.message : t('users.loadError'));
+    } finally {
+      setIsLoadingUsers(false);
     }
-  }, [canAssignShopAndRole, session]);
+  }, [session, t]);
+
+  const loadPageData = useCallback(async () => {
+    if (!session) {
+      return;
+    }
+
+    setPageError('');
+
+    try {
+      if (canAssignShopAndRole) {
+        const nextShops = await apiGet<Shop[]>('/shops');
+        setShops(nextShops);
+        setShopId((currentShopId) => currentShopId || nextShops[0]?.id || '');
+      }
+      await loadUsers();
+    } catch (caughtError) {
+      setPageError(caughtError instanceof Error ? caughtError.message : t('users.loadDataError'));
+    }
+  }, [canAssignShopAndRole, loadUsers, session, t]);
+
+  function userCountLabel(count: number) {
+    return count === 1 ? t('users.userSingular') : t('users.userPlural');
+  }
 
   useEffect(() => {
-    void loadShops();
-  }, [loadShops]);
+    void loadPageData();
+  }, [loadPageData]);
+
+  useEffect(() => {
+    if (canAssignShopAndRole && assignableRoles.length > 0 && !selectedRole) {
+      setRole(assignableRoles[0].value);
+    }
+  }, [assignableRoles, canAssignShopAndRole, selectedRole]);
+
+  const usersByShop = users.reduce<Record<string, CreatedUser[]>>((groups, user) => {
+    const key = user.shopId ?? 'company';
+    return {
+      ...groups,
+      [key]: [...(groups[key] ?? []), user],
+    };
+  }, {});
+  const ownShopId = session?.shopId ?? users.find((user) => user.shopId)?.shopId;
+
+  const shopFolders = canAssignShopAndRole
+    ? shops.map((shop) => ({
+        id: shop.id,
+        name: shop.name,
+        users: usersByShop[shop.id] ?? [],
+      }))
+    : [{
+        id: ownShopId ?? 'own-shop',
+        name: getShopName(ownShopId),
+        users: users.filter((user) => user.shopId === ownShopId),
+      }];
+
+  const companyUsers = usersByShop.company ?? [];
 
   async function handleCreateUser() {
     if (!session) {
       return;
     }
 
-    setError('');
+    setCreateError('');
 
-    if (!username || !password) {
-      setError('Username and password are required.');
+    if (!password) {
+      setCreateError(t('users.required'));
+      return;
+    }
+
+    if (password.length < 8) {
+      setCreateError(t('users.passwordLength'));
+      return;
+    }
+
+    if (shouldAssignShop && !shopId) {
+      setCreateError(t('users.shopRequired'));
       return;
     }
 
@@ -61,90 +135,135 @@ export function UserManagementPage() {
 
     try {
       const payload = canAssignShopAndRole
-        ? { username, password, role, shopId: shopId || undefined }
-        : { username, password };
-      const createdUser = await registerUser(session.token, payload);
-      setCreatedUsers((users) => [createdUser, ...users]);
-      setUsername('');
+        ? { password, role, shopId: shouldAssignShop ? shopId : undefined }
+        : { password };
+      await apiPost<CreatedUser>('/auth/register', payload);
+      await loadUsers();
       setPassword('');
+      setIsCreateModalOpen(false);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : 'Could not create user.');
+      setCreateError(caughtError instanceof Error ? caughtError.message : t('users.createError'));
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  return (
-    <section className="management-grid">
-      <div>
-        <p className="eyebrow">Users</p>
-        <h1>User management</h1>
-        <p className="lede">Create phone scanner users, shop admins, or company managers based on your role.</p>
-      </div>
-      <div className="control-panel">
-        <label>
-          Username
-          <input value={username} onChange={(event) => setUsername(event.target.value)} required autoComplete="off" />
-        </label>
-        <label>
-          Password
-          <input value={password} onChange={(event) => setPassword(event.target.value)} required minLength={8} type="password" autoComplete="new-password" />
-        </label>
-        {canAssignShopAndRole && (
-          <>
-            <label>
-              Role
-              <select value={role} onChange={(event) => setRole(event.target.value as CreateableRole)}>
-                <option value="ROLE_USER">Scanner user</option>
-                <option value="ROLE_ADMIN">Shop admin</option>
-                <option value="ROLE_MANAGER">Company manager</option>
-              </select>
-            </label>
-            <label>
-              Shop
-              <select value={shopId} onChange={(event) => setShopId(event.target.value)}>
-                <option value="">No shop</option>
-                {shops.map((shop) => (
-                  <option key={shop.id} value={shop.id}>{shop.name}</option>
-                ))}
-              </select>
-            </label>
-          </>
-        )}
-        {error && <StatusMessage type="error">{error}</StatusMessage>}
-        <button className="primary-action" disabled={isSubmitting} type="button" onClick={() => void handleCreateUser()}>
-          {isSubmitting ? 'Creating...' : 'Create user'}
-        </button>
-      </div>
+  function openCreateModal() {
+    setCreateError('');
+    setIsCreateModalOpen(true);
+  }
 
+  function closeCreateModal() {
+    if (!isSubmitting) {
+      setCreateError('');
+      setIsCreateModalOpen(false);
+    }
+  }
+
+  return (
+    <section className="stack-page">
       <section className="table-section">
-        <h2>Created this session</h2>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Username</th>
-                <th>Role</th>
-                <th>Shop</th>
-              </tr>
-            </thead>
-            <tbody>
-              {createdUsers.map((user) => (
-                <tr key={user.id}>
-                  <td>{user.username}</td>
-                  <td>{user.role}</td>
-                  <td>{getShopName(user.shopId)}</td>
-                </tr>
-              ))}
-              {createdUsers.length === 0 && (
-                <tr>
-                  <td colSpan={3}>No users created yet.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        <div className="page-actions-row">
+          <button className="primary-action" type="button" onClick={openCreateModal}>
+            {t('users.create')}
+          </button>
+          <button className="secondary-action" type="button" onClick={() => void loadPageData()}>
+            {t('common.refresh')}
+          </button>
+        </div>
+        {pageError && <StatusMessage type="error">{pageError}</StatusMessage>}
+        <div className="user-folder-list">
+          {shopFolders.map((shop) => (
+            <section className="user-folder" key={shop.id}>
+              <div className="user-folder-header">
+                <span className="folder-icon" aria-hidden="true">&gt;</span>
+                <h3>{shop.name}</h3>
+                <span>{shop.users.length} {userCountLabel(shop.users.length)}</span>
+              </div>
+              <div className="user-list">
+                {shop.users.map((user) => (
+                  <div className="user-row" key={user.id}>
+                    <strong>{user.username}</strong>
+                    <span>{user.roleLabel}</span>
+                  </div>
+                ))}
+                {!isLoadingUsers && shop.users.length === 0 && <p className="inline-note">{t('users.noAssigned')}</p>}
+              </div>
+            </section>
+          ))}
+
+          {canAssignShopAndRole && companyUsers.length > 0 && (
+            <section className="user-folder">
+              <div className="user-folder-header">
+                <span className="folder-icon" aria-hidden="true">&gt;</span>
+                <h3>{t('users.companyUsersFolder')}</h3>
+                <span>{companyUsers.length} {userCountLabel(companyUsers.length)}</span>
+              </div>
+              <div className="user-list">
+                {companyUsers.map((user) => (
+                  <div className="user-row" key={user.id}>
+                    <strong>{user.username}</strong>
+                    <span>{user.roleLabel}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {isLoadingUsers && <p className="inline-note">{t('users.loading')}</p>}
+          {!isLoadingUsers && users.length === 0 && <p className="inline-note">{t('users.empty')}</p>}
         </div>
       </section>
+
+      {isCreateModalOpen && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={closeCreateModal}>
+          <section className="modal-panel" role="dialog" aria-modal="true" aria-label={t('users.create')} onMouseDown={(event) => event.stopPropagation()}>
+            <button className="modal-close" aria-label={t('common.cancel')} disabled={isSubmitting} type="button" onClick={closeCreateModal}>
+              x
+            </button>
+            <div className="control-panel modal-form">
+              <p className="inline-note">{t('users.generatedUsername')}</p>
+              <label>
+                {t('users.password')}
+                <input value={password} onChange={(event) => setPassword(event.target.value)} required minLength={8} type="password" autoComplete="new-password" />
+              </label>
+              {canAssignShopAndRole && (
+                <>
+                  <label>
+                    {t('users.role')}
+                    <select value={role} onChange={(event) => setRole(event.target.value)}>
+                      {assignableRoles.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  {shouldAssignShop ? (
+                    <label>
+                      {t('users.shop')}
+                      <select value={shopId} onChange={(event) => setShopId(event.target.value)}>
+                        {shops.map((shop) => (
+                          <option key={shop.id} value={shop.id}>{shop.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : (
+                    <p className="inline-note">{t('users.companyLevelUser')}</p>
+                  )}
+                </>
+              )}
+              {createError && <StatusMessage type="error">{createError}</StatusMessage>}
+              <div className="modal-actions">
+                <button className="secondary-action" disabled={isSubmitting} type="button" onClick={closeCreateModal}>
+                  {t('common.cancel')}
+                </button>
+                <button className="primary-action" disabled={isSubmitting} type="button" onClick={() => void handleCreateUser()}>
+                  {isSubmitting ? t('users.creating') : t('users.create')}
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
     </section>
   );
 }

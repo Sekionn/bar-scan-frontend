@@ -1,13 +1,12 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth';
-import type { Role } from '../../types';
+import type { AuthCapabilities } from '../../types';
 
 type ProtectedRouteProps = {
-  requiredRole?: Role;
-  allowedRoles?: Role[];
+  requiredCapability?: keyof AuthCapabilities;
 };
 
-export function ProtectedRoute({ requiredRole, allowedRoles }: ProtectedRouteProps) {
+export function ProtectedRoute({ requiredCapability }: ProtectedRouteProps) {
   const { session } = useAuth();
   const location = useLocation();
 
@@ -15,9 +14,7 @@ export function ProtectedRoute({ requiredRole, allowedRoles }: ProtectedRoutePro
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
-  const roles = allowedRoles ?? (requiredRole ? [requiredRole] : undefined);
-
-  if (roles && !roles.includes(session.role)) {
+  if (requiredCapability && !session.capabilities[requiredCapability]) {
     return <Navigate to="/not-authorized" replace />;
   }
 

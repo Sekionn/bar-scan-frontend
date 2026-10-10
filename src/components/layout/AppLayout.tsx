@@ -1,12 +1,12 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth';
+import { useTranslation } from '../../i18n/useTranslation';
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 export function AppLayout() {
   const { session, logout } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
-  const canUseWebData = session?.role === 'ROLE_ADMIN' || session?.role === 'ROLE_MANAGER' || session?.role === 'ROLE_SUPER_ADMIN';
-  const canManageShops = session?.role === 'ROLE_MANAGER' || session?.role === 'ROLE_SUPER_ADMIN';
-  const canManageUsers = session?.role === 'ROLE_ADMIN' || session?.role === 'ROLE_MANAGER' || session?.role === 'ROLE_SUPER_ADMIN';
 
   function handleLogout() {
     logout();
@@ -16,22 +16,27 @@ export function AppLayout() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <NavLink to="/" className="brand">Bar Scan</NavLink>
-        <nav className="nav-links" aria-label="Primary navigation">
+        <NavLink to="/" className="brand" aria-label="Bar Scan">
+          <img src="/barscan-logo.png" alt="" />
+        </NavLink>
+        <nav className="nav-links" aria-label={t('nav.primary')}>
           {session ? (
             <>
-              {canUseWebData && <NavLink to="/products">Products</NavLink>}
-              {canUseWebData && <NavLink to="/scan-session">Scan session</NavLink>}
-              {canManageShops && <NavLink to="/shops">Shops</NavLink>}
-              {canManageUsers && <NavLink to="/users">Users</NavLink>}
-              <button className="text-button" type="button" onClick={handleLogout}>Logout</button>
+              {session.capabilities.canUseWebData && <NavLink to="/product-archive">{t('nav.fiscalArchive')}</NavLink>}
+              {session.capabilities.canManageShops && <NavLink to="/shops">{t('nav.shops')}</NavLink>}
+              {session.capabilities.canManageUsers && <NavLink to="/users">{t('nav.users')}</NavLink>}
+              <button className="text-button" type="button" onClick={handleLogout}>{t('nav.logout')}</button>
             </>
           ) : (
             <>
-              <NavLink to="/login">Login</NavLink>
-              <NavLink to="/signup">Signup</NavLink>
+              <NavLink to="/login">{t('nav.login')}</NavLink>
+              <NavLink to="/signup">{t('nav.signup')}</NavLink>
+              <NavLink to="/privacy">{t('nav.privacy')}</NavLink>
+              <NavLink to="/terms">{t('nav.terms')}</NavLink>
+              <NavLink to="/support">{t('nav.support')}</NavLink>
             </>
           )}
+          <LanguageSwitcher />
         </nav>
       </header>
       <main className="page-frame">

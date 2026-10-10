@@ -1,35 +1,147 @@
-import type { ContactSignupResponse, CreatedUser, Product, Role, Shop, SignupStatus } from '../types';
+import type { ContactSignupResponse, ProductArchivePage, SignupStatus } from '../types';
 
 const rawApiBaseUrl = import.meta.env.VITE_BACKEND_URL ?? 'http://127.0.0.1:8080';
 const apiBaseUrl = rawApiBaseUrl.replace(/\/$/, '');
-
-type RequestOptions = Omit<RequestInit, 'body'> & {
-  token?: string;
-  body?: unknown;
-};
+const sessionStorageKey = 'bar-scan-session';
+const authExpiredEventName = 'bar-scan-auth-expired';
+const authRefreshedEventName = 'bar-scan-auth-refreshed';
+const tokenRefreshWindowMs = 60_000;
 
 type ApiErrorBody = {
   message?: string;
   error?: string;
 };
 
-async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const headers = new Headers(options.headers);
+type StoredSession = {
+  token?: string;
+};
 
-  if (options.body !== undefined) {
-    headers.set('Content-Type', 'application/json');
+function getStoredToken() {
+  const storedValue = localStorage.getItem(sessionStorageKey);
+
+  if (!storedValue) {
+    return undefined;
   }
 
-  if (options.token) {
-    headers.set('Authorization', `Bearer ${options.token}`);
+  if (!storedValue.startsWith('{')) {
+    return storedValue;
   }
 
-  const response = await fetch(`${apiBaseUrl}${path}`, {
-    ...options,
-    headers,
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+  try {
+    const token = (JSON.parse(storedValue) as StoredSession).token;
+
+    if (token) {
+      localStorage.setItem(sessionStorageKey, token);
+      return token;
+    }
+  } catch {
+    // Fall through and clear malformed legacy session values.
+  }
+
+  localStorage.removeItem(sessionStorageKey);
+  return undefined;
+}
+
+function getRequiredToken() {
+  const token = getStoredToken();
+
+  if (!token) {
+    throw new Error('Missing authentication token.');
+  }
+
+  return token;
+}
+
+function decodeTokenExpiry(token: string) {
+  try {
+    const [, payload] = token.split('.');
+    if (!payload) {
+      return 0;
+    }
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+    const claims = JSON.parse(atob(padded)) as { exp?: number };
+    return claims.exp ? claims.exp * 1000 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function storeToken(token: string) {
+  localStorage.setItem(sessionStorageKey, token);
+  window.dispatchEvent(new CustomEvent(authRefreshedEventName, { detail: { token } }));
+}
+
+function clearTokenAndNotify() {
+  localStorage.removeItem(sessionStorageKey);
+  window.dispatchEvent(new Event(authExpiredEventName));
+}
+
+async function refreshToken(token: string): Promise<string | undefined> {
+  const response = await fetch(`${apiBaseUrl}/auth/refresh`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
   });
 
+  if (!response.ok) {
+    return undefined;
+  }
+
+  const body = (await response.json()) as { token?: string };
+  if (!body.token) {
+    return undefined;
+  }
+
+  storeToken(body.token);
+  return body.token;
+}
+
+async function getRequestToken() {
+  const token = getRequiredToken();
+  const expiresAt = decodeTokenExpiry(token);
+
+  if (expiresAt > Date.now() + tokenRefreshWindowMs) {
+    return token;
+  }
+
+  const refreshedToken = await refreshToken(token);
+  if (!refreshedToken) {
+    clearTokenAndNotify();
+    throw new Error('Authentication expired. Please log in again.');
+  }
+
+  return refreshedToken;
+}
+
+async function retryAfterRefresh(response: Response, retry: (token: string) => Promise<Response>) {
+  if (response.status !== 401) {
+    return response;
+  }
+
+  const token = getStoredToken();
+  if (!token) {
+    clearTokenAndNotify();
+    return response;
+  }
+
+  const refreshedToken = await refreshToken(token);
+  if (!refreshedToken) {
+    clearTokenAndNotify();
+    return response;
+  }
+
+  const retryResponse = await retry(refreshedToken);
+  if (retryResponse.status === 401) {
+    clearTokenAndNotify();
+  }
+
+  return retryResponse;
+}
+
+async function parseError(response: Response): Promise<Error> {
   if (!response.ok) {
     let errorMessage = `${response.status} ${response.statusText}`;
 
@@ -40,7 +152,15 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       // Keep the HTTP status fallback when the backend has no JSON error body.
     }
 
-    throw new Error(errorMessage);
+    return new Error(errorMessage);
+  }
+
+  return new Error('Unexpected API response');
+}
+
+async function readJson<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    throw await parseError(response);
   }
 
   if (response.status === 204) {
@@ -50,17 +170,53 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   return response.json() as Promise<T>;
 }
 
-export function startSignup(payload: {
-  companyName: string;
-  locationName: string;
-  allowedUserCount: number;
-  adminEmail: string;
-  adminPassword: string;
-}) {
-  return request<SignupStatus>('/signup/start', {
-    method: 'POST',
-    body: payload,
+export async function apiGet<T>(path: string): Promise<T> {
+  const token = await getRequestToken();
+  const request = (nextToken: string) => fetch(`${apiBaseUrl}${path}`, {
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${nextToken}`,
+    },
   });
+  const response = await retryAfterRefresh(await request(token), request);
+
+  return readJson<T>(response);
+}
+
+export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
+  const token = await getRequestToken();
+  const request = (nextToken: string) => fetch(`${apiBaseUrl}${path}`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${nextToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const response = await retryAfterRefresh(await request(token), request);
+
+  return readJson<T>(response);
+}
+
+export async function apiPut<T>(path: string, body: unknown): Promise<T> {
+  const token = await getRequestToken();
+  const request = (nextToken: string) => fetch(`${apiBaseUrl}${path}`, {
+    method: 'PUT',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${nextToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  const response = await retryAfterRefresh(await request(token), request);
+
+  return readJson<T>(response);
+}
+
+export function login(payload: { username: string; password: string }) {
+  return publicApiPost<{ token: string }>('/auth/login', payload);
 }
 
 export function requestContactSignup(payload: {
@@ -70,87 +226,99 @@ export function requestContactSignup(payload: {
   adminEmail: string;
   message: string;
 }) {
-  return request<ContactSignupResponse>('/signup/contact', {
-    method: 'POST',
-    body: payload,
-  });
-}
-
-export function completeDevPayment(paymentSessionId: string) {
-  return request<SignupStatus>(`/payments/dev/complete/${paymentSessionId}`, {
-    method: 'POST',
-  });
+  return publicApiPost<ContactSignupResponse>('/signup/contact', payload);
 }
 
 export function getSignupStatus(signupId: string) {
-  return request<SignupStatus>(`/signup/${signupId}`);
+  return publicApiGet<SignupStatus>(`/signup/${signupId}`);
 }
 
-export function login(payload: { username: string; password: string }) {
-  return request<{ token: string }>('/auth/login', {
-    method: 'POST',
-    body: payload,
-  });
+export function completeDevPayment(paymentSessionId: string) {
+  return publicApiPost<SignupStatus>(`/payments/dev/complete/${paymentSessionId}`);
 }
 
-export function getCurrentUser(token: string) {
-  return request<{ username: string }>('/auth/me', { token });
-}
-
-export function registerUser(token: string, payload: {
-  username: string;
-  password: string;
-  shopId?: string;
-  role?: Extract<Role, 'ROLE_USER' | 'ROLE_ADMIN' | 'ROLE_MANAGER'>;
-}) {
-  return request<CreatedUser>('/auth/register', {
-    method: 'POST',
-    token,
-    body: payload,
-  });
-}
-
-export function getShops(token: string) {
-  return request<Shop[]>('/shops', { token });
-}
-
-export function createShop(token: string, payload: { name: string }) {
-  return request<Shop>('/shops', {
-    method: 'POST',
-    token,
-    body: payload,
-  });
-}
-
-export function setInitialAdminPassword(token: string, adminUserId: string, password: string) {
-  return request<CreatedUser>(`/super/users/${adminUserId}/password`, {
-    method: 'PUT',
-    token,
-    body: { password },
-  });
-}
-
-export function getProducts(token: string, quarter?: string) {
-  const query = quarter ? `?quarter=${encodeURIComponent(quarter)}` : '';
-  return request<Product[]>(`/products${query}`, { token });
-}
-
-export async function exportProducts(token: string, quarter: string | undefined, format: 'csv' | 'txt') {
-  const params = new URLSearchParams({ format });
-
-  if (quarter) {
-    params.set('quarter', quarter);
-  }
-
-  const response = await fetch(`${apiBaseUrl}/products/export?${params.toString()}`, {
+async function publicApiGet<T>(path: string): Promise<T> {
+  const response = await fetch(`${apiBaseUrl}${path}`, {
     headers: {
-      Authorization: `Bearer ${token}`,
+      Accept: 'application/json',
     },
   });
 
+  return readJson<T>(response);
+}
+
+async function publicApiPost<T>(path: string, body?: unknown): Promise<T> {
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+
+  return readJson<T>(response);
+}
+
+async function apiGetBlob(path: string, accept: 'text/csv' | 'text/plain'): Promise<Blob> {
+  const token = await getRequestToken();
+  const request = (nextToken: string) => fetch(`${apiBaseUrl}${path}`, {
+    headers: {
+      Accept: accept,
+      Authorization: `Bearer ${nextToken}`,
+    },
+  });
+  const response = await retryAfterRefresh(await request(token), request);
+
   if (!response.ok) {
-    throw new Error(`Export failed: ${response.status} ${response.statusText}`);
+    throw await parseError(response);
   }
 
   return response.blob();
 }
+
+export function getProductArchiveProducts(params: {
+  shopId: string;
+  year?: number;
+  quarter?: 'Q1' | 'Q2' | 'Q3' | 'Q4';
+  date?: string;
+  page: number;
+  size: number;
+}) {
+  const query = new URLSearchParams({
+    shopId: params.shopId,
+    page: String(params.page),
+    size: String(params.size),
+  });
+
+  if (params.date) {
+    query.set('date', params.date);
+  } else {
+    query.set('year', String(params.year));
+    query.set('quarter', String(params.quarter));
+  }
+
+  return apiGet<ProductArchivePage>(`/products/archive/products?${query.toString()}`);
+}
+
+export async function exportProductArchiveProducts(params: {
+  shopId: string;
+  year?: number;
+  quarter?: 'Q1' | 'Q2' | 'Q3' | 'Q4';
+  date?: string;
+  format: 'csv' | 'txt';
+}) {
+  const query = new URLSearchParams({
+    shopId: params.shopId,
+  });
+
+  if (params.date) {
+    query.set('date', params.date);
+  } else {
+    query.set('year', String(params.year));
+    query.set('quarter', String(params.quarter));
+  }
+
+  return apiGetBlob(`/products/archive/export?${query.toString()}`, params.format === 'txt' ? 'text/plain' : 'text/csv');
+}
+

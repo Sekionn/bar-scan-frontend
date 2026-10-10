@@ -1,12 +1,12 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from '../../i18n/useTranslation';
 
 export function NotAuthorizedPage() {
+  const { t } = useTranslation();
+
   return (
     <section className="status-page">
-      <p className="eyebrow">Access</p>
-      <h1>Not authorized</h1>
-      <p className="lede">This account does not have access to that web section.</p>
-      <Link className="primary-action" to="/">Back to start</Link>
+      <Link className="primary-action" to="/">{t('common.backToStart')}</Link>
     </section>
   );
 }

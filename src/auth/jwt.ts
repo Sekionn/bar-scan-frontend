@@ -1,10 +1,13 @@
-import type { AuthSession, Role } from '../types';
+import type { AuthCapabilities, AuthSession, UserRoleOption } from '../types';
 
 type JwtPayload = {
   sub?: string;
   userId?: string;
   companyId?: string;
-  role?: Role;
+  shopId?: string;
+  exp?: number;
+  capabilities?: AuthCapabilities;
+  assignableRoles?: UserRoleOption[];
 };
 
 function decodeBase64Url(value: string) {
@@ -22,7 +25,7 @@ export function createSessionFromToken(token: string): AuthSession {
 
   const claims = JSON.parse(decodeBase64Url(payload)) as JwtPayload;
 
-  if (!claims.sub || !claims.userId || !claims.companyId || !claims.role) {
+  if (!claims.sub || !claims.userId || !claims.companyId || !claims.exp || !claims.capabilities || !claims.assignableRoles) {
     throw new Error('Login token is missing required user claims.');
   }
 
@@ -31,6 +34,9 @@ export function createSessionFromToken(token: string): AuthSession {
     username: claims.sub,
     userId: claims.userId,
     companyId: claims.companyId,
-    role: claims.role,
+    shopId: claims.shopId,
+    expiresAt: claims.exp * 1000,
+    capabilities: claims.capabilities,
+    assignableRoles: claims.assignableRoles,
   };
 }

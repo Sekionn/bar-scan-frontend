@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { completeDevPayment, getSignupStatus } from '../../api/client';
 import { StatusMessage } from '../../components/feedback/StatusMessage';
+import { useTranslation } from '../../i18n/useTranslation';
 import type { SignupStatus } from '../../types';
 
 export function PaymentPendingPage() {
+  const { t } = useTranslation();
   const { signupId = '' } = useParams();
   const location = useLocation();
   const initialSignup = location.state as SignupStatus | null;
@@ -41,18 +43,18 @@ export function PaymentPendingPage() {
         setStatus(nextStatus);
         setPollCount((value) => value + 1);
       } catch (caughtError) {
-        setError(caughtError instanceof Error ? caughtError.message : 'Could not check signup status.');
+        setError(caughtError instanceof Error ? caughtError.message : t('payment.statusError'));
       }
     }, 1000);
 
     return () => window.clearInterval(timer);
-  }, [signupId, isCompleted]);
+  }, [signupId, isCompleted, t]);
 
   async function handleDevCompletePayment() {
     const paymentSessionId = status?.paymentSessionId ?? storedSignup?.paymentSessionId;
 
     if (!paymentSessionId) {
-      setError('Missing payment session reference.');
+      setError(t('payment.missingSession'));
       return;
     }
 
@@ -63,7 +65,7 @@ export function PaymentPendingPage() {
       const nextStatus = await completeDevPayment(paymentSessionId);
       setStatus(nextStatus);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : 'Payment completion failed.');
+      setError(caughtError instanceof Error ? caughtError.message : t('payment.completeError'));
     } finally {
       setIsCompletingPayment(false);
     }
@@ -71,31 +73,28 @@ export function PaymentPendingPage() {
 
   return (
     <section className="status-page">
-      <p className="eyebrow">Signup status</p>
-      <h1>{isCompleted ? 'Subscription active' : 'Payment pending'}</h1>
-
       <div className="status-strip">
-        <span>Payment: {status?.paymentStatus ?? 'Unknown'}</span>
-        <span>Onboarding: {status?.onboardingStatus ?? 'Unknown'}</span>
+        <span>{t('payment.payment', { status: status?.paymentStatus ?? t('common.unknown') })}</span>
+        <span>{t('payment.onboarding', { status: status?.onboardingStatus ?? t('common.unknown') })}</span>
       </div>
 
       {paymentUrl && !isCompleted && (
         <a className="primary-action" href={paymentUrl} target="_blank" rel="noreferrer">
-          Open payment
+          {t('payment.open')}
         </a>
       )}
 
       {!isCompleted && (
         <button className="secondary-action" disabled={isCompletingPayment} type="button" onClick={handleDevCompletePayment}>
-          {isCompletingPayment ? 'Completing...' : 'Complete dev payment'}
+          {isCompletingPayment ? t('payment.completing') : t('payment.completeDev')}
         </button>
       )}
 
       {pollCount > 30 && !isCompleted && (
-        <StatusMessage type="info">Onboarding is still pending. You can keep this page open while the backend finishes.</StatusMessage>
+        <StatusMessage type="info">{t('payment.stillPending')}</StatusMessage>
       )}
       {error && <StatusMessage type="error">{error}</StatusMessage>}
-      {isCompleted && <Link className="primary-action" to="/login">Login as admin</Link>}
+      {isCompleted && <Link className="primary-action" to="/login">{t('payment.loginAsAdmin')}</Link>}
     </section>
   );
 }

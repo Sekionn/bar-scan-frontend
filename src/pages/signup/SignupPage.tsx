@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { requestContactSignup } from '../../api/client';
 import { StatusMessage } from '../../components/feedback/StatusMessage';
+import { useTranslation } from '../../i18n/useTranslation';
 
 export function SignupPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [companyName, setCompanyName] = useState('');
   const [locationName, setLocationName] = useState('');
   const [allowedUserCount, setAllowedUserCount] = useState(1);
@@ -17,12 +19,12 @@ export function SignupPage() {
     setError('');
 
     if (!companyName || !locationName || !adminEmail) {
-      setError('Company name, location name, and admin email are required.');
+      setError(t('signup.required'));
       return;
     }
 
     if (allowedUserCount < 1) {
-      setError('Allowed user count must be at least 1.');
+      setError(t('signup.userCount'));
       return;
     }
 
@@ -39,43 +41,38 @@ export function SignupPage() {
 
       navigate('/signup-submitted', { state: signup });
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : 'Signup failed.');
+      setError(caughtError instanceof Error ? caughtError.message : t('signup.failed'));
     } finally {
       setIsSubmitting(false);
     }
   }
 
   return (
-    <section className="split-page">
-      <div>
-        <p className="eyebrow">Contact request</p>
-        <h1>Signup</h1>
-        <p className="lede">Tell us what you need. We will create the company/admin setup and contact the admin email to arrange payment manually.</p>
-      </div>
+    <section className="form-page signup-page">
       <div className="control-panel">
         <label>
-          Company name
+          {t('signup.companyName')}
           <input value={companyName} onChange={(event) => setCompanyName(event.target.value)} required />
         </label>
         <label>
-          Location name
+          {t('signup.locationName')}
           <input value={locationName} onChange={(event) => setLocationName(event.target.value)} required />
         </label>
         <label>
-          Monthly users
+          {t('signup.monthlyUsers')}
           <input min={1} type="number" value={allowedUserCount} onChange={(event) => setAllowedUserCount(Number(event.target.value))} required />
         </label>
         <label>
-          Admin email
+          {t('signup.adminEmail')}
           <input value={adminEmail} onChange={(event) => setAdminEmail(event.target.value)} required type="email" autoComplete="email" />
         </label>
         <label>
-          Message
-          <textarea value={message} onChange={(event) => setMessage(event.target.value)} rows={4} placeholder="Anything we should know before contacting you?" />
+          {t('signup.message')}
+          <textarea value={message} onChange={(event) => setMessage(event.target.value)} rows={3} placeholder={t('signup.messagePlaceholder')} />
         </label>
         {error && <StatusMessage type="error">{error}</StatusMessage>}
         <button className="primary-action" disabled={isSubmitting} type="button" onClick={() => void handleSignupRequest()}>
-          {isSubmitting ? 'Sending request...' : 'Request company setup'}
+          {isSubmitting ? t('signup.sending') : t('signup.request')}
         </button>
       </div>
     </section>

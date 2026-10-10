@@ -1,23 +1,20 @@
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth';
+import { useTranslation } from '../../i18n/useTranslation';
 
 export function HomePage() {
   const { session } = useAuth();
+  const { t } = useTranslation();
 
   if (session) {
-    return <Navigate to="/products" replace />;
+    return <Navigate to="/product-archive" replace />;
   }
 
   return (
-    <section className="hero-panel">
-      <div>
-        <p className="eyebrow">Inventory counting</p>
-        <h1>Bar Scan</h1>
-        <p className="lede">Sign up a company, manage shops and users, and review scanned barcode counts by quarter.</p>
-      </div>
+    <section className="entry-page">
       <div className="hero-actions">
-        <Link className="primary-action" to="/signup">Create company</Link>
-        <Link className="secondary-action" to="/login">Login</Link>
+        <Link className="primary-action" to="/signup">{t('home.createCompany')}</Link>
+        <Link className="secondary-action" to="/login">{t('nav.login')}</Link>
       </div>
     </section>
   );

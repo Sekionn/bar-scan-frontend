@@ -1,11 +1,26 @@
-export type Role = 'ROLE_SUPER_ADMIN' | 'ROLE_MANAGER' | 'ROLE_ADMIN' | 'ROLE_USER';
+export type AuthCapabilities = {
+  canUseWebData: boolean;
+  canManageShops: boolean;
+  canManageUsers: boolean;
+  canAccessSuperUserPassword: boolean;
+  canAssignShopAndRole: boolean;
+};
+
+export type UserRoleOption = {
+  value: string;
+  label: string;
+  requiresShop: boolean;
+};
 
 export type AuthSession = {
   token: string;
   username: string;
   userId: string;
   companyId: string;
-  role: Role;
+  shopId?: string;
+  expiresAt: number;
+  capabilities: AuthCapabilities;
+  assignableRoles: UserRoleOption[];
 };
 
 export type SignupStatus = {
@@ -25,24 +40,12 @@ export type ContactSignupResponse = {
   message?: string;
 };
 
-export type Product = {
-  companyId: string;
-  shopId: string;
-  productId: string;
-  barcode: string;
-  shelfOfOrigin: number;
-  storeSegment: string;
-  amountCounted: number;
-  countedDate: string;
-  countedQuarter: string;
-};
-
 export type CreatedUser = {
   id: string;
   username: string;
   companyId: string;
   shopId?: string;
-  role: Role;
+  roleLabel: string;
 };
 
 export type Shop = {
@@ -50,3 +53,63 @@ export type Shop = {
   name: string;
   companyId?: string;
 };
+
+export type ProductArchiveDate = {
+  date: string;
+  productCount: number;
+};
+
+export type ProductArchiveQuarter = {
+  quarter: 'Q1' | 'Q2' | 'Q3' | 'Q4';
+  productCount: number;
+  dates: ProductArchiveDate[];
+};
+
+export type ProductArchiveYear = {
+  year: number;
+  productCount: number;
+  quarters: ProductArchiveQuarter[];
+};
+
+export type ProductArchiveShop = {
+  shopId: string;
+  shopName: string;
+  productCount: number;
+  years: ProductArchiveYear[];
+};
+
+export type ProductArchive = {
+  shops: ProductArchiveShop[];
+};
+
+export type QueueStatus = {
+  companyId: string;
+  shopId: string;
+  pendingMessages: number;
+  processedMessages: number;
+  pendingPercentage: number;
+  upToDate: boolean;
+};
+
+export type ProductArchiveItem = {
+  shopId: string;
+  shopName: string;
+  sessionId: string;
+  barcode: string;
+  shelfOfOrigin: number;
+  storeSegment: string;
+  amountCounted: number;
+  countedDate: string;
+  year: number;
+  quarter: 'Q1' | 'Q2' | 'Q3' | 'Q4';
+  date: string;
+};
+
+export type ProductArchivePage = {
+  products: ProductArchiveItem[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+};
+
