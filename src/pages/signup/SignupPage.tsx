@@ -8,7 +8,6 @@ export function SignupPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [companyName, setCompanyName] = useState('');
-  const [locationName, setLocationName] = useState('');
   const [allowedUserCount, setAllowedUserCount] = useState(1);
   const [adminEmail, setAdminEmail] = useState('');
   const [message, setMessage] = useState('');
@@ -18,7 +17,7 @@ export function SignupPage() {
   async function handleSignupRequest() {
     setError('');
 
-    if (!companyName || !locationName || !adminEmail) {
+    if (!companyName || !adminEmail) {
       setError(t('signup.required'));
       return;
     }
@@ -33,7 +32,6 @@ export function SignupPage() {
     try {
       const signup = await requestContactSignup({
         companyName,
-        locationName,
         allowedUserCount,
         adminEmail,
         message,
@@ -53,10 +51,6 @@ export function SignupPage() {
         <label>
           {t('signup.companyName')}
           <input value={companyName} onChange={(event) => setCompanyName(event.target.value)} required />
-        </label>
-        <label>
-          {t('signup.locationName')}
-          <input value={locationName} onChange={(event) => setLocationName(event.target.value)} required />
         </label>
         <label>
           {t('signup.monthlyUsers')}

@@ -246,7 +246,6 @@ export function login(payload: { username: string; password: string }) {
 
 export function requestContactSignup(payload: {
   companyName: string;
-  locationName: string;
   allowedUserCount: number;
   adminEmail: string;
   message: string;
