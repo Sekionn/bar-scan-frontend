@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { apiGet, apiPost } from '../../api/client';
+import { apiDelete, apiGet, apiPost, apiPut } from '../../api/client';
 import { useAuth } from '../../auth/useAuth';
 import { StatusMessage } from '../../components/feedback/StatusMessage';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -18,6 +18,11 @@ export function UserManagementPage() {
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [passwordUser, setPasswordUser] = useState<CreatedUser | null>(null);
+  const [removeUser, setRemoveUser] = useState<CreatedUser | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [isActionSubmitting, setIsActionSubmitting] = useState(false);
 
   const canAssignShopAndRole = session?.capabilities.canAssignShopAndRole ?? false;
   const assignableRoles = session?.assignableRoles ?? [];
@@ -158,6 +163,52 @@ export function UserManagementPage() {
     }
   }
 
+  async function handleResetPassword() {
+    if (!passwordUser) {
+      return;
+    }
+
+    setActionError('');
+    if (!newPassword) {
+      setActionError(t('users.newPasswordRequired'));
+      return;
+    }
+    if (newPassword.length < 8) {
+      setActionError(t('users.passwordLength'));
+      return;
+    }
+
+    setIsActionSubmitting(true);
+    try {
+      await apiPut<CreatedUser>(`/auth/users/${passwordUser.id}/password`, { password: newPassword });
+      setNewPassword('');
+      setPasswordUser(null);
+      await loadUsers();
+    } catch (caughtError) {
+      setActionError(caughtError instanceof Error ? caughtError.message : t('users.passwordResetError'));
+    } finally {
+      setIsActionSubmitting(false);
+    }
+  }
+
+  async function handleRemoveUser() {
+    if (!removeUser) {
+      return;
+    }
+
+    setActionError('');
+    setIsActionSubmitting(true);
+    try {
+      await apiDelete(`/auth/users/${removeUser.id}`);
+      setRemoveUser(null);
+      await loadUsers();
+    } catch (caughtError) {
+      setActionError(caughtError instanceof Error ? caughtError.message : t('users.removeError'));
+    } finally {
+      setIsActionSubmitting(false);
+    }
+  }
+
   function openCreateModal() {
     setCreateError('');
     setIsCreateModalOpen(true);
@@ -168,6 +219,49 @@ export function UserManagementPage() {
       setCreateError('');
       setIsCreateModalOpen(false);
     }
+  }
+
+  function openPasswordModal(user: CreatedUser) {
+    setActionError('');
+    setNewPassword('');
+    setPasswordUser(user);
+  }
+
+  function openRemoveModal(user: CreatedUser) {
+    setActionError('');
+    setRemoveUser(user);
+  }
+
+  function closeActionModal() {
+    if (!isActionSubmitting) {
+      setActionError('');
+      setNewPassword('');
+      setPasswordUser(null);
+      setRemoveUser(null);
+    }
+  }
+
+  function renderUserRow(user: CreatedUser) {
+    const canManageTarget = user.id !== session?.userId;
+
+    return (
+      <div className="user-row" key={user.id}>
+        <div className="user-row-main">
+          <strong>{user.username}</strong>
+          <span>{user.roleLabel}</span>
+        </div>
+        {canManageTarget && (
+          <div className="row-actions compact-actions">
+            <button className="secondary-action small-action" type="button" onClick={() => openPasswordModal(user)}>
+              {t('users.resetPassword')}
+            </button>
+            <button className="secondary-action danger-action small-action" type="button" onClick={() => openRemoveModal(user)}>
+              {t('users.remove')}
+            </button>
+          </div>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -191,12 +285,7 @@ export function UserManagementPage() {
                 <span>{shop.users.length} {userCountLabel(shop.users.length)}</span>
               </div>
               <div className="user-list">
-                {shop.users.map((user) => (
-                  <div className="user-row" key={user.id}>
-                    <strong>{user.username}</strong>
-                    <span>{user.roleLabel}</span>
-                  </div>
-                ))}
+                {shop.users.map(renderUserRow)}
                 {!isLoadingUsers && shop.users.length === 0 && <p className="inline-note">{t('users.noAssigned')}</p>}
               </div>
             </section>
@@ -210,12 +299,7 @@ export function UserManagementPage() {
                 <span>{companyUsers.length} {userCountLabel(companyUsers.length)}</span>
               </div>
               <div className="user-list">
-                {companyUsers.map((user) => (
-                  <div className="user-row" key={user.id}>
-                    <strong>{user.username}</strong>
-                    <span>{user.roleLabel}</span>
-                  </div>
-                ))}
+                {companyUsers.map(renderUserRow)}
               </div>
             </section>
           )}
@@ -268,6 +352,54 @@ export function UserManagementPage() {
                 </button>
                 <button className="primary-action" disabled={isSubmitting} type="button" onClick={() => void handleCreateUser()}>
                   {isSubmitting ? t('users.creating') : t('users.create')}
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {passwordUser && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={closeActionModal}>
+          <section className="modal-panel" role="dialog" aria-modal="true" aria-label={t('users.resetPassword')} onMouseDown={(event) => event.stopPropagation()}>
+            <button className="modal-close" aria-label={t('common.cancel')} disabled={isActionSubmitting} type="button" onClick={closeActionModal}>
+              x
+            </button>
+            <div className="control-panel modal-form">
+              <p className="inline-note">{t('users.resetPasswordFor', { username: passwordUser.username })}</p>
+              <label>
+                {t('users.newPassword')}
+                <input value={newPassword} onChange={(event) => setNewPassword(event.target.value)} required minLength={8} type="password" autoComplete="new-password" />
+              </label>
+              {actionError && <StatusMessage type="error">{actionError}</StatusMessage>}
+              <div className="modal-actions">
+                <button className="secondary-action" disabled={isActionSubmitting} type="button" onClick={closeActionModal}>
+                  {t('common.cancel')}
+                </button>
+                <button className="primary-action" disabled={isActionSubmitting} type="button" onClick={() => void handleResetPassword()}>
+                  {isActionSubmitting ? t('users.savingPassword') : t('users.savePassword')}
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {removeUser && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={closeActionModal}>
+          <section className="modal-panel" role="dialog" aria-modal="true" aria-label={t('users.remove')} onMouseDown={(event) => event.stopPropagation()}>
+            <button className="modal-close" aria-label={t('common.cancel')} disabled={isActionSubmitting} type="button" onClick={closeActionModal}>
+              x
+            </button>
+            <div className="control-panel modal-form">
+              <p className="inline-note">{t('users.removeConfirm', { username: removeUser.username })}</p>
+              {actionError && <StatusMessage type="error">{actionError}</StatusMessage>}
+              <div className="modal-actions">
+                <button className="secondary-action" disabled={isActionSubmitting} type="button" onClick={closeActionModal}>
+                  {t('common.cancel')}
+                </button>
+                <button className="primary-action danger-primary-action" disabled={isActionSubmitting} type="button" onClick={() => void handleRemoveUser()}>
+                  {isActionSubmitting ? t('users.removing') : t('users.remove')}
                 </button>
               </div>
             </div>

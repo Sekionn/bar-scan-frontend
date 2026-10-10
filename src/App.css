@@ -342,10 +342,26 @@ textarea:focus {
   color: #ffffff;
 }
 
+.danger-primary-action {
+  background: #9a1d1d;
+  color: #ffffff;
+}
+
 .secondary-action {
   background: #ffffff;
   border-color: #b8c2d0;
   color: #17202a;
+}
+
+.danger-action {
+  border-color: #d59b9b;
+  color: #9a1d1d;
+}
+
+.small-action {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 0.86rem;
 }
 
 .primary-action:disabled,
@@ -659,6 +675,17 @@ textarea:focus {
   border-radius: 6px;
   background: #ffffff;
   padding: 8px 0;
+}
+
+.user-row-main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.compact-actions {
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .user-row span {

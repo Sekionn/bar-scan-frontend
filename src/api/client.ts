@@ -224,6 +224,22 @@ export async function apiPut<T>(path: string, body: unknown): Promise<T> {
   return readJson<T>(response);
 }
 
+export async function apiDelete(path: string): Promise<void> {
+  const token = await getRequestToken();
+  const request = (nextToken: string) => fetch(`${apiBaseUrl}${path}`, {
+    method: 'DELETE',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${nextToken}`,
+    },
+  });
+  const response = await retryAfterRefresh(await request(token), request);
+
+  if (!response.ok) {
+    throw await parseError(response);
+  }
+}
+
 export function login(payload: { username: string; password: string }) {
   return publicApiPost<{ token: string }>('/auth/login', payload);
 }
