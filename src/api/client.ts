@@ -99,6 +99,15 @@ async function refreshToken(token: string): Promise<string | undefined> {
   return body.token;
 }
 
+export async function refreshStoredSessionToken(): Promise<string | undefined> {
+  const token = getStoredToken();
+  if (!token) {
+    return undefined;
+  }
+
+  return refreshToken(token);
+}
+
 async function getRequestToken() {
   const token = getRequiredToken();
   const expiresAt = decodeTokenExpiry(token);

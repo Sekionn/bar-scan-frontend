@@ -24,6 +24,16 @@ export function UserManagementPage() {
   const selectedRole = assignableRoles.find((option) => option.value === role);
   const shouldAssignShop = canAssignShopAndRole && selectedRole?.requiresShop;
 
+  function userTypeLabel(value: string, fallback: string) {
+    if (value === 'mobile_user') {
+      return t('users.userType.mobileUser');
+    }
+    if (value === 'data_analyst') {
+      return t('users.userType.dataAnalyst');
+    }
+    return fallback;
+  }
+
   function getShopName(targetShopId?: string) {
     if (!targetShopId) {
       return t('users.companyUsers');
@@ -233,7 +243,7 @@ export function UserManagementPage() {
                     {t('users.userType')}
                     <select value={role} onChange={(event) => setRole(event.target.value)}>
                       {assignableRoles.map((option) => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
+                        <option key={option.value} value={option.value}>{userTypeLabel(option.value, option.label)}</option>
                       ))}
                     </select>
                   </label>

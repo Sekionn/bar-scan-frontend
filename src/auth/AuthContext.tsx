@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { refreshStoredSessionToken } from '../api/client';
 import { AuthContext, type AuthContextValue } from './auth-context';
 import { createSessionFromToken } from './jwt';
 import type { AuthSession } from '../types';
@@ -34,6 +35,33 @@ function getStoredSession() {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSessionState] = useState<AuthSession | null>(() => getStoredSession());
+
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+
+    let isActive = true;
+
+    refreshStoredSessionToken()
+      .then((token) => {
+        if (!isActive) {
+          return;
+        }
+        if (!token) {
+          localStorage.removeItem(storageKey);
+          setSessionState(null);
+        }
+      })
+      .catch(() => {
+        // Keep the current session when the network is unavailable; API calls
+        // still handle 401 responses by clearing the session.
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   useEffect(() => {
     function handleAuthExpired() {
