@@ -230,7 +230,7 @@ export function UserManagementPage() {
               {canAssignShopAndRole && (
                 <>
                   <label>
-                    {t('users.role')}
+                    {t('users.userType')}
                     <select value={role} onChange={(event) => setRole(event.target.value)}>
                       {assignableRoles.map((option) => (
                         <option key={option.value} value={option.value}>{option.label}</option>
