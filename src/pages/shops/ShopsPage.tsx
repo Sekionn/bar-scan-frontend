@@ -18,6 +18,7 @@ export function ShopsPage() {
   const [removeShop, setRemoveShop] = useState<Shop | null>(null);
   const [removeError, setRemoveError] = useState('');
   const [isRemoving, setIsRemoving] = useState(false);
+  const canManageShops = session?.capabilities.canManageShops ?? false;
 
   const loadShops = useCallback(async () => {
     if (!session) {
@@ -113,9 +114,11 @@ export function ShopsPage() {
     <section className="stack-page">
       <section className="table-section">
         <div className="page-actions-row">
-          <button className="primary-action" type="button" onClick={openCreateModal}>
-            {t('shops.create')}
-          </button>
+          {canManageShops && (
+            <button className="primary-action" type="button" onClick={openCreateModal}>
+              {t('shops.create')}
+            </button>
+          )}
           <button className="secondary-action" type="button" onClick={() => void loadShops()}>
             {t('common.refresh')}
           </button>
@@ -126,28 +129,30 @@ export function ShopsPage() {
             <thead>
               <tr>
                 <th>{t('shops.nameColumn')}</th>
-                <th>{t('common.actions')}</th>
+                {canManageShops && <th>{t('common.actions')}</th>}
               </tr>
             </thead>
             <tbody>
               {shops.map((shop) => (
                 <tr key={shop.id}>
                   <td>{shop.name}</td>
-                  <td>
-                    <button className="secondary-action danger-action small-action" type="button" onClick={() => openRemoveModal(shop)}>
-                      {t('shops.remove')}
-                    </button>
-                  </td>
+                  {canManageShops && (
+                    <td>
+                      <button className="secondary-action danger-action small-action" type="button" onClick={() => openRemoveModal(shop)}>
+                        {t('shops.remove')}
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
               {isLoading && (
                 <tr>
-                  <td colSpan={2}>{t('shops.loading')}</td>
+                  <td colSpan={canManageShops ? 2 : 1}>{t('shops.loading')}</td>
                 </tr>
               )}
               {!isLoading && shops.length === 0 && (
                 <tr>
-                  <td colSpan={2}>{t('shops.empty')}</td>
+                  <td colSpan={canManageShops ? 2 : 1}>{t('shops.empty')}</td>
                 </tr>
               )}
             </tbody>
@@ -155,7 +160,7 @@ export function ShopsPage() {
         </div>
       </section>
 
-      {isCreateModalOpen && (
+      {canManageShops && isCreateModalOpen && (
         <div className="modal-backdrop" role="presentation" onMouseDown={closeCreateModal}>
           <section className="modal-panel" role="dialog" aria-modal="true" aria-label={t('shops.create')} onMouseDown={(event) => event.stopPropagation()}>
             <button className="modal-close" aria-label={t('common.cancel')} disabled={isSubmitting} type="button" onClick={closeCreateModal}>
@@ -180,7 +185,7 @@ export function ShopsPage() {
         </div>
       )}
 
-      {removeShop && (
+      {canManageShops && removeShop && (
         <div className="modal-backdrop" role="presentation" onMouseDown={closeRemoveModal}>
           <section className="modal-panel" role="dialog" aria-modal="true" aria-label={t('shops.remove')} onMouseDown={(event) => event.stopPropagation()}>
             <button className="modal-close" aria-label={t('common.cancel')} disabled={isRemoving} type="button" onClick={closeRemoveModal}>

@@ -1,6 +1,8 @@
 export type AuthCapabilities = {
   canUseWebData: boolean;
+  canViewShops: boolean;
   canManageShops: boolean;
+  canViewUsers: boolean;
   canManageUsers: boolean;
   canAccessSuperUserPassword: boolean;
   canAssignShopAndRole: boolean;

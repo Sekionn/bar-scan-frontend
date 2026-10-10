@@ -24,6 +24,8 @@ export function UserManagementPage() {
   const [actionError, setActionError] = useState('');
   const [isActionSubmitting, setIsActionSubmitting] = useState(false);
 
+  const canManageUsers = session?.capabilities.canManageUsers ?? false;
+  const canViewShops = session?.capabilities.canViewShops ?? false;
   const canAssignShopAndRole = session?.capabilities.canAssignShopAndRole ?? false;
   const assignableRoles = session?.assignableRoles ?? [];
   const selectedRole = assignableRoles.find((option) => option.value === role);
@@ -76,7 +78,7 @@ export function UserManagementPage() {
     setPageError('');
 
     try {
-      if (canAssignShopAndRole) {
+      if (canViewShops) {
         const nextShops = await apiGet<Shop[]>('/shops');
         setShops(nextShops);
         setShopId((currentShopId) => currentShopId || nextShops[0]?.id || '');
@@ -85,7 +87,7 @@ export function UserManagementPage() {
     } catch (caughtError) {
       setPageError(caughtError instanceof Error ? caughtError.message : t('users.loadDataError'));
     }
-  }, [canAssignShopAndRole, loadUsers, session, t]);
+  }, [canViewShops, loadUsers, session, t]);
 
   function userCountLabel(count: number) {
     return count === 1 ? t('users.userSingular') : t('users.userPlural');
@@ -110,7 +112,7 @@ export function UserManagementPage() {
   }, {});
   const ownShopId = session?.shopId ?? users.find((user) => user.shopId)?.shopId;
 
-  const shopFolders = canAssignShopAndRole
+  const shopFolders = canViewShops
     ? shops.map((shop) => ({
         id: shop.id,
         name: shop.name,
@@ -125,7 +127,7 @@ export function UserManagementPage() {
   const companyUsers = usersByShop.company ?? [];
 
   async function handleCreateUser() {
-    if (!session) {
+    if (!session || !canManageUsers) {
       return;
     }
 
@@ -164,7 +166,7 @@ export function UserManagementPage() {
   }
 
   async function handleResetPassword() {
-    if (!passwordUser) {
+    if (!passwordUser || !canManageUsers) {
       return;
     }
 
@@ -192,7 +194,7 @@ export function UserManagementPage() {
   }
 
   async function handleRemoveUser() {
-    if (!removeUser) {
+    if (!removeUser || !canManageUsers) {
       return;
     }
 
@@ -210,6 +212,9 @@ export function UserManagementPage() {
   }
 
   function openCreateModal() {
+    if (!canManageUsers) {
+      return;
+    }
     setCreateError('');
     setIsCreateModalOpen(true);
   }
@@ -222,12 +227,18 @@ export function UserManagementPage() {
   }
 
   function openPasswordModal(user: CreatedUser) {
+    if (!canManageUsers) {
+      return;
+    }
     setActionError('');
     setNewPassword('');
     setPasswordUser(user);
   }
 
   function openRemoveModal(user: CreatedUser) {
+    if (!canManageUsers) {
+      return;
+    }
     setActionError('');
     setRemoveUser(user);
   }
@@ -242,7 +253,7 @@ export function UserManagementPage() {
   }
 
   function renderUserRow(user: CreatedUser) {
-    const canManageTarget = user.id !== session?.userId;
+    const canManageTarget = canManageUsers && user.id !== session?.userId;
 
     return (
       <div className="user-row" key={user.id}>
@@ -268,9 +279,11 @@ export function UserManagementPage() {
     <section className="stack-page">
       <section className="table-section">
         <div className="page-actions-row">
-          <button className="primary-action" type="button" onClick={openCreateModal}>
-            {t('users.create')}
-          </button>
+          {canManageUsers && (
+            <button className="primary-action" type="button" onClick={openCreateModal}>
+              {t('users.create')}
+            </button>
+          )}
           <button className="secondary-action" type="button" onClick={() => void loadPageData()}>
             {t('common.refresh')}
           </button>
@@ -291,7 +304,7 @@ export function UserManagementPage() {
             </section>
           ))}
 
-          {canAssignShopAndRole && companyUsers.length > 0 && (
+          {companyUsers.length > 0 && (
             <section className="user-folder">
               <div className="user-folder-header">
                 <span className="folder-icon" aria-hidden="true">&gt;</span>
@@ -309,7 +322,7 @@ export function UserManagementPage() {
         </div>
       </section>
 
-      {isCreateModalOpen && (
+      {canManageUsers && isCreateModalOpen && (
         <div className="modal-backdrop" role="presentation" onMouseDown={closeCreateModal}>
           <section className="modal-panel" role="dialog" aria-modal="true" aria-label={t('users.create')} onMouseDown={(event) => event.stopPropagation()}>
             <button className="modal-close" aria-label={t('common.cancel')} disabled={isSubmitting} type="button" onClick={closeCreateModal}>
@@ -359,7 +372,7 @@ export function UserManagementPage() {
         </div>
       )}
 
-      {passwordUser && (
+      {canManageUsers && passwordUser && (
         <div className="modal-backdrop" role="presentation" onMouseDown={closeActionModal}>
           <section className="modal-panel" role="dialog" aria-modal="true" aria-label={t('users.resetPassword')} onMouseDown={(event) => event.stopPropagation()}>
             <button className="modal-close" aria-label={t('common.cancel')} disabled={isActionSubmitting} type="button" onClick={closeActionModal}>
@@ -385,7 +398,7 @@ export function UserManagementPage() {
         </div>
       )}
 
-      {removeUser && (
+      {canManageUsers && removeUser && (
         <div className="modal-backdrop" role="presentation" onMouseDown={closeActionModal}>
           <section className="modal-panel" role="dialog" aria-modal="true" aria-label={t('users.remove')} onMouseDown={(event) => event.stopPropagation()}>
             <button className="modal-close" aria-label={t('common.cancel')} disabled={isActionSubmitting} type="button" onClick={closeActionModal}>

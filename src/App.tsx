@@ -39,11 +39,11 @@ export default function App() {
           <Route path="/scan-session" element={<Navigate to="/product-archive" replace />} />
         </Route>
 
-        <Route element={<ProtectedRoute requiredCapability="canManageUsers" />}>
+        <Route element={<ProtectedRoute requiredCapability="canViewUsers" />}>
           <Route path="/users" element={<UserManagementPage />} />
         </Route>
 
-        <Route element={<ProtectedRoute requiredCapability="canManageShops" />}>
+        <Route element={<ProtectedRoute requiredCapability="canViewShops" />}>
           <Route path="/shops" element={<ShopsPage />} />
         </Route>
 
