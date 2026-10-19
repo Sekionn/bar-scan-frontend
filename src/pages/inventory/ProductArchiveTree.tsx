@@ -12,6 +12,18 @@ function formatDateKey(dateKey: string, locale: string) {
   return new Date(`${dateKey}T00:00:00`).toLocaleDateString(locale);
 }
 
+function quarterDateRange(year: number, quarter: ProductArchiveQuarter['quarter']) {
+  const quarterNumber = Number(quarter.replace('Q', ''));
+  const startMonth = ((quarterNumber - 1) * 3) + 1;
+  const endMonth = startMonth + 2;
+  const endDay = new Date(year, endMonth, 0).getDate();
+
+  return {
+    startDate: `${year}-${String(startMonth).padStart(2, '0')}-01`,
+    endDate: `${year}-${String(endMonth).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`,
+  };
+}
+
 export function ProductArchiveTree() {
   const { session } = useAuth();
   const { language, t } = useTranslation();
@@ -92,26 +104,47 @@ export function ProductArchiveTree() {
                   <div className="archive-folder-children">
                     {quarterNames.map((quarterName) => archiveYear.quarters.find((item) => item.quarter === quarterName))
                       .filter((item): item is ProductArchiveQuarter => Boolean(item))
-                      .map((archiveQuarter) => (
-                        <details className="archive-folder nested" key={archiveQuarter.quarter}>
-                          <summary>
-                            <span>{archiveQuarter.quarter}</span>
-                            <small>{archiveQuarter.productCount} {scannedProductLabel(archiveQuarter.productCount)}</small>
-                          </summary>
-                          <div className="archive-folder-children">
-                            <Link className="folder-page-link" to={`/products?mode=quarter&shopId=${shop.shopId}&year=${archiveYear.year}&quarter=${archiveQuarter.quarter}`}>
-                              {t('archive.openQuarter', { year: archiveYear.year, quarter: archiveQuarter.quarter })}
-                            </Link>
-                            {archiveQuarter.dates.map((archiveDate) => (
-                              <div className="archive-date-row" key={archiveDate.date}>
-                                <span>{formatDateKey(archiveDate.date, language === 'da' ? 'da-DK' : 'en-GB')}</span>
-                                <small>{archiveDate.productCount} {scannedProductLabel(archiveDate.productCount)}</small>
-                                <Link to={`/products?mode=date&shopId=${shop.shopId}&date=${archiveDate.date}`}>{t('common.open')}</Link>
-                              </div>
-                            ))}
-                          </div>
-                        </details>
-                      ))}
+                      .map((archiveQuarter) => {
+                        const range = quarterDateRange(archiveYear.year, archiveQuarter.quarter);
+
+                        return (
+                          <details className="archive-folder nested" key={archiveQuarter.quarter}>
+                            <summary>
+                              <span>{archiveQuarter.quarter}</span>
+                              <small>{archiveQuarter.productCount} {scannedProductLabel(archiveQuarter.productCount)}</small>
+                            </summary>
+                            <div className="archive-folder-children">
+                              <Link
+                                className="folder-page-link"
+                                to={`/products?shopId=${shop.shopId}`}
+                                state={{
+                                  shopName: shop.shopName,
+                                  startDate: range.startDate,
+                                  endDate: range.endDate,
+                                }}
+                              >
+                                {t('archive.openQuarter', { year: archiveYear.year, quarter: archiveQuarter.quarter })}
+                              </Link>
+                              {archiveQuarter.dates.map((archiveDate) => (
+                                <div className="archive-date-row" key={archiveDate.date}>
+                                  <span>{formatDateKey(archiveDate.date, language === 'da' ? 'da-DK' : 'en-GB')}</span>
+                                  <small>{archiveDate.productCount} {scannedProductLabel(archiveDate.productCount)}</small>
+                                  <Link
+                                    to={`/products?shopId=${shop.shopId}`}
+                                    state={{
+                                      shopName: shop.shopName,
+                                      startDate: archiveDate.date,
+                                      endDate: archiveDate.date,
+                                    }}
+                                  >
+                                    {t('common.open')}
+                                  </Link>
+                                </div>
+                              ))}
+                            </div>
+                          </details>
+                        );
+                      })}
                   </div>
                 </details>
               ))}

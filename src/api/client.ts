@@ -303,45 +303,33 @@ async function apiGetBlob(path: string, accept: 'text/csv' | 'text/plain'): Prom
 
 export function getProductArchiveProducts(params: {
   shopId: string;
-  year?: number;
-  quarter?: 'Q1' | 'Q2' | 'Q3' | 'Q4';
-  date?: string;
+  startDate: string;
+  endDate: string;
   page: number;
   size: number;
 }) {
   const query = new URLSearchParams({
     shopId: params.shopId,
+    startDate: params.startDate,
+    endDate: params.endDate,
     page: String(params.page),
     size: String(params.size),
   });
-
-  if (params.date) {
-    query.set('date', params.date);
-  } else {
-    query.set('year', String(params.year));
-    query.set('quarter', String(params.quarter));
-  }
 
   return apiGet<ProductArchivePage>(`/products/archive/products?${query.toString()}`);
 }
 
 export async function exportProductArchiveProducts(params: {
   shopId: string;
-  year?: number;
-  quarter?: 'Q1' | 'Q2' | 'Q3' | 'Q4';
-  date?: string;
+  startDate: string;
+  endDate: string;
   format: 'csv' | 'txt';
 }) {
   const query = new URLSearchParams({
     shopId: params.shopId,
+    startDate: params.startDate,
+    endDate: params.endDate,
   });
-
-  if (params.date) {
-    query.set('date', params.date);
-  } else {
-    query.set('year', String(params.year));
-    query.set('quarter', String(params.quarter));
-  }
 
   return apiGetBlob(`/products/archive/export?${query.toString()}`, params.format === 'txt' ? 'text/plain' : 'text/csv');
 }

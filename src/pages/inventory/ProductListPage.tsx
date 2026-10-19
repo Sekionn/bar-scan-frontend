@@ -1,32 +1,37 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, Navigate, useSearchParams } from 'react-router-dom';
-import { apiGet, exportProductArchiveProducts, getProductArchiveProducts } from '../../api/client';
+import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom';
+import { exportProductArchiveProducts, getProductArchiveProducts } from '../../api/client';
 import { useAuth } from '../../auth/useAuth';
 import { StatusMessage } from '../../components/feedback/StatusMessage';
 import { useTranslation } from '../../i18n/useTranslation';
-import type { ProductArchive, ProductArchiveItem, ProductArchiveQuarter } from '../../types';
+import type { ProductArchiveItem } from '../../types';
 
 const pageSizes = [25, 50, 100] as const;
-
-function formatDateKey(dateKey: string, locale: string) {
-  return new Date(`${dateKey}T00:00:00`).toLocaleDateString(locale);
-}
 
 function formatExportDate(dateKey: string) {
   const [year = '', month = '', day = ''] = dateKey.split('-');
   return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year.slice(-2)}`;
 }
 
-function productViewTitle(searchParams: URLSearchParams, products: ProductArchiveItem[], locale: string, fallbackStoreName: string, shopName?: string) {
-  const resolvedShopName = products[0]?.shopName ?? shopName ?? fallbackStoreName;
-  const mode = searchParams.get('mode');
+function formatDisplayDate(dateKey: string, locale: string) {
+  return new Date(`${dateKey}T00:00:00`).toLocaleDateString(locale);
+}
 
-  if (mode === 'date') {
-    const date = searchParams.get('date') ?? '';
-    return `${resolvedShopName} - ${formatDateKey(date, locale)}`;
+function productViewTitle(
+  products: ProductArchiveItem[],
+  locale: string,
+  fallbackStoreName: string,
+  startDate: string,
+  endDate: string,
+  shopName?: string,
+) {
+  const resolvedShopName = products[0]?.shopName ?? shopName ?? fallbackStoreName;
+
+  if (startDate === endDate) {
+    return `${resolvedShopName} - ${formatDisplayDate(startDate, locale)}`;
   }
 
-  return `${resolvedShopName} - ${searchParams.get('year')} ${searchParams.get('quarter')}`;
+  return `${resolvedShopName} - ${formatDisplayDate(startDate, locale)} - ${formatDisplayDate(endDate, locale)}`;
 }
 
 function downloadBlob(blob: Blob, filename: string) {
@@ -40,47 +45,42 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+type ProductListLocationState = {
+  shopName?: string;
+  startDate?: string;
+  endDate?: string;
+};
+
 export function ProductListPage() {
   const { session } = useAuth();
   const { language, t } = useTranslation();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
-  const [archive, setArchive] = useState<ProductArchive>({ shops: [] });
+  const locationState = location.state as ProductListLocationState | null;
   const [products, setProducts] = useState<ProductArchiveItem[]>([]);
   const [totalElements, setTotalElements] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [exportFormat, setExportFormat] = useState<'csv' | 'txt'>('csv');
   const [pageSize, setPageSize] = useState<(typeof pageSizes)[number]>(50);
   const [page, setPage] = useState(1);
+  const [startDate, setStartDate] = useState(locationState?.startDate ?? '');
+  const [endDate, setEndDate] = useState(locationState?.endDate ?? '');
   const [error, setError] = useState('');
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
-  const mode = searchParams.get('mode');
   const shopId = searchParams.get('shopId') ?? '';
-  const year = searchParams.get('year');
-  const quarter = searchParams.get('quarter') as ProductArchiveQuarter['quarter'] | null;
-  const date = searchParams.get('date');
-  const isTableView = Boolean(mode);
-
-  const selectedShopName = useMemo(
-    () => archive.shops.find((shop) => shop.shopId === shopId)?.shopName,
-    [archive.shops, shopId],
-  );
+  const isTableView = Boolean(shopId && startDate && endDate);
   const locale = language === 'da' ? 'da-DK' : 'en-GB';
-  const tableTitle = productViewTitle(searchParams, products, locale, t('users.store'), selectedShopName);
+  const tableTitle = useMemo(
+    () => productViewTitle(products, locale, t('users.store'), startDate, endDate, locationState?.shopName),
+    [endDate, locale, locationState?.shopName, products, startDate, t],
+  );
 
-  const loadArchive = useCallback(async () => {
-    if (!session) {
-      return;
-    }
-
-    setError('');
-    try {
-      setArchive(await apiGet<ProductArchive>('/products/archive'));
-    } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : t('archive.loadError'));
-    }
-  }, [session, t]);
+  useEffect(() => {
+    setStartDate(locationState?.startDate ?? '');
+    setEndDate(locationState?.endDate ?? '');
+  }, [locationState?.endDate, locationState?.startDate]);
 
   const loadProducts = useCallback(async () => {
     if (!session || !isTableView || !shopId) {
@@ -90,15 +90,22 @@ export function ProductListPage() {
       return;
     }
 
+    if (endDate < startDate) {
+      setProducts([]);
+      setTotalElements(0);
+      setTotalPages(1);
+      setError(t('products.invalidDateRange'));
+      return;
+    }
+
     setError('');
     setIsLoadingProducts(true);
 
     try {
       const response = await getProductArchiveProducts({
         shopId,
-        year: year ? Number(year) : undefined,
-        quarter: quarter ?? undefined,
-        date: date ?? undefined,
+        startDate,
+        endDate,
         page,
         size: pageSize,
       });
@@ -110,11 +117,7 @@ export function ProductListPage() {
     } finally {
       setIsLoadingProducts(false);
     }
-  }, [date, isTableView, page, pageSize, quarter, session, shopId, t, year]);
-
-  useEffect(() => {
-    void loadArchive();
-  }, [loadArchive]);
+  }, [endDate, isTableView, page, pageSize, session, shopId, startDate, t]);
 
   useEffect(() => {
     void loadProducts();
@@ -122,10 +125,15 @@ export function ProductListPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [pageSize, searchParams]);
+  }, [endDate, pageSize, shopId, startDate]);
 
   async function handleExport() {
     if (!session || !shopId) {
+      return;
+    }
+
+    if (endDate < startDate) {
+      setError(t('products.invalidDateRange'));
       return;
     }
 
@@ -139,9 +147,8 @@ export function ProductListPage() {
     try {
       const blob = await exportProductArchiveProducts({
         shopId,
-        year: year ? Number(year) : undefined,
-        quarter: quarter ?? undefined,
-        date: date ?? undefined,
+        startDate,
+        endDate,
         format: exportFormat,
       });
       downloadBlob(blob, `bar-scan-${title}.${exportFormat}`);
@@ -160,8 +167,8 @@ export function ProductListPage() {
     <section className="list-page">
       <div className="page-actions-row">
         <div className="row-actions">
-          {isTableView && <Link className="secondary-action" to="/product-archive">{t('products.backToArchive')}</Link>}
-          <button className="secondary-action" type="button" onClick={() => void (isTableView ? loadProducts() : loadArchive())}>
+          <Link className="secondary-action" to="/product-archive">{t('products.backToArchive')}</Link>
+          <button className="secondary-action" type="button" onClick={() => void loadProducts()}>
             {t('common.refresh')}
           </button>
         </div>
@@ -170,6 +177,14 @@ export function ProductListPage() {
       {error && <StatusMessage type="error">{error}</StatusMessage>}
 
       <section className="toolbar-panel archive-toolbar">
+        <div className="toolbar-field">
+          <span>{t('products.startDate')}</span>
+          <input aria-label={t('products.startDate')} type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+        </div>
+        <div className="toolbar-field">
+          <span>{t('products.endDate')}</span>
+          <input aria-label={t('products.endDate')} type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+        </div>
         <div className="toolbar-field">
           <span>{t('products.rows')}</span>
           <select aria-label={t('products.rows')} value={pageSize} onChange={(event) => setPageSize(Number(event.target.value) as typeof pageSize)}>

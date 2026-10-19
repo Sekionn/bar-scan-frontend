@@ -266,7 +266,7 @@ h2 {
 }
 
 .archive-toolbar {
-  grid-template-columns: minmax(100px, 140px) minmax(140px, 180px) auto;
+  grid-template-columns: repeat(4, minmax(130px, 180px)) auto;
   justify-content: start;
 }
 
