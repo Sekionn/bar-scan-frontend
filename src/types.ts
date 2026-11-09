@@ -6,6 +6,7 @@ export type AuthCapabilities = {
   canManageUsers: boolean;
   canAccessSuperUserPassword: boolean;
   canAssignShopAndRole: boolean;
+  canManagePlatform: boolean;
 };
 
 export type UserRoleOption = {
@@ -40,6 +41,23 @@ export type ContactSignupResponse = {
   username: string;
   contactStatus: 'CONTACT_REQUESTED' | 'CREATED';
   message?: string;
+};
+
+export type PendingSignupRequest = {
+  id: string;
+  companyName: string;
+  allowedUserCount: number;
+  adminEmail: string;
+  message: string;
+  requestedAt: string;
+};
+
+export type PendingSignupRequestPage = {
+  requests: PendingSignupRequest[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
 };
 
 export type CreatedUser = {

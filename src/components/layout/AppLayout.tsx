@@ -25,6 +25,7 @@ export function AppLayout() {
               {session.capabilities.canUseWebData && <NavLink to="/product-archive">{t('nav.fiscalArchive')}</NavLink>}
               {session.capabilities.canViewShops && <NavLink to="/shops">{t('nav.shops')}</NavLink>}
               {session.capabilities.canViewUsers && <NavLink to="/users">{t('nav.users')}</NavLink>}
+              {session.capabilities.canManagePlatform && <NavLink to="/admin">{t('nav.admin')}</NavLink>}
               <button className="text-button" type="button" onClick={handleLogout}>{t('nav.logout')}</button>
             </>
           ) : (

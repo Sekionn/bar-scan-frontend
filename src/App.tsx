@@ -14,6 +14,7 @@ import { PaymentPendingPage } from './pages/payment/PaymentPendingPage';
 import { ShopsPage } from './pages/shops/ShopsPage';
 import { SignupPage } from './pages/signup/SignupPage';
 import { SignupSubmittedPage } from './pages/signup/SignupSubmittedPage';
+import { SuperAdminPage } from './pages/super-admin/SuperAdminPage';
 import { SuperAdminPasswordPage } from './pages/super-admin/SuperAdminPasswordPage';
 import { UserManagementPage } from './pages/users/UserManagementPage';
 import './App.css';
@@ -53,6 +54,10 @@ export default function App() {
 
         <Route element={<ProtectedRoute requiredCapability="canAccessSuperUserPassword" />}>
           <Route path="/super/users/password" element={<SuperAdminPasswordPage />} />
+        </Route>
+
+        <Route element={<ProtectedRoute requiredCapability="canManagePlatform" />}>
+          <Route path="/admin" element={<SuperAdminPage />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
