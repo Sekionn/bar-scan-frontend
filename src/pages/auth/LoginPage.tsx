@@ -61,6 +61,7 @@ export function LoginPage() {
         <button className="primary-action" disabled={isSubmitting} type="button" onClick={() => void handleLogin()}>
           {isSubmitting ? t('login.submitting') : t('login.submit')}
         </button>
+        <p className="inline-note"><Link to="/forgot-password">{t('login.forgotPassword')}</Link></p>
         <p className="inline-note">{t('login.newCompany')} <Link to="/signup">{t('login.startSignup')}</Link></p>
       </div>
     </section>

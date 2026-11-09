@@ -3,6 +3,8 @@ import { AppLayout } from './components/layout/AppLayout';
 import { LocalOnlyRoute } from './components/routing/LocalOnlyRoute';
 import { ProtectedRoute } from './components/routing/ProtectedRoute';
 import { LoginPage } from './pages/auth/LoginPage';
+import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
+import { SetPasswordPage } from './pages/auth/SetPasswordPage';
 import { NotAuthorizedPage } from './pages/errors/NotAuthorizedPage';
 import { HomePage } from './pages/home/HomePage';
 import { ProductArchiveTree } from './pages/inventory/ProductArchiveTree';
@@ -22,6 +24,8 @@ export default function App() {
       <Route element={<AppLayout />}>
         <Route index element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/set-password" element={<SetPasswordPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/signup-submitted" element={<SignupSubmittedPage />} />
         <Route path="/not-authorized" element={<NotAuthorizedPage />} />

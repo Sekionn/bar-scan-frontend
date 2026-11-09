@@ -244,6 +244,14 @@ export function login(payload: { username: string; password: string }) {
   return publicApiPost<{ token: string }>('/auth/login', { ...payload, clientType: 'web' });
 }
 
+export function requestPasswordReset(email: string) {
+  return publicApiPost<void>('/auth/password-reset/request', { email });
+}
+
+export function confirmPasswordReset(payload: { token: string; password: string }) {
+  return publicApiPost<void>('/auth/password-reset/confirm', payload);
+}
+
 export function requestContactSignup(payload: {
   companyName: string;
   allowedUserCount: number;
